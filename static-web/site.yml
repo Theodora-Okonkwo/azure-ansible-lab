@@ -1,0 +1,44 @@
+---
+- name: "Play 1 | Install Nginx"
+  hosts: web
+  become: true
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+    - name: Start and enable Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+- name: "Play 2 | Deploy Static Content"
+  hosts: web
+  become: true
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+  tasks:
+    - name: Copy index.html to web servers
+      ansible.builtin.copy:
+        src: files/index.html
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: "0644"
+      notify: Reload Nginx
+- name: "Play 3 | Verify Deployment"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check HTTP 200 from each web server
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}"
+        status_code: 200
+      loop: "{{ groups['web'] }}"

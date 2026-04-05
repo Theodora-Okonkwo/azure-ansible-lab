@@ -1,0 +1,30 @@
+# Terraform state files (contain sensitive data)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform variables (may contain secrets)
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform directories
+.terraform/
+.terraform.lock.hcl
+
+# Crash logs
+crash.log
+crash.*.log
+
+# SSH keys - never commit these!
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Ansible sensitive files
+inventory.ini
+*.retry
+
+# OS files
+.DS_Store
+Thumbs.db

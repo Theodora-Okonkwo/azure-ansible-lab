@@ -21,7 +21,7 @@ any VM manually.
 azure-ansible-lab/
 ├── main.tf              # All Azure resources
 ├── variables.tf         # Variable declarations
-├── terraform.tfvars     # Variable values
+├── terraform.tfvars     # Variable values (not committed — see .gitignore)
 ├── outputs.tf           # Output definitions
 └── static-web/
     ├── inventory.ini    # Ansible host list
@@ -47,13 +47,13 @@ azure-ansible-lab/
 
 ## VM Details
 
-| Role | Hostname | Public IP     |
-|------|----------|---------------|
-| web1 | vm-web1  | 20.115.24.241 |
-| web2 | vm-web2  | 20.102.66.87  |
+| Role | Hostname | Public IP        |
+|------|----------|------------------|
+| web1 | vm-web1  | <web1_public_ip> |
+| web2 | vm-web2  | <web2_public_ip> |
 
-> **Note:** IPs above are from this lab run. They change after
-> `terraform destroy` and re-apply.
+> **Note:** IPs change after terraform destroy and re-apply.
+> Run terraform output vm_roles_with_ips to get the current IPs.
 
 ---
 
@@ -252,15 +252,18 @@ output "ssh_command_examples" {
 
 ### terraform.tfvars
 
+> ⚠️ This file is excluded from git via .gitignore — never commit it.
+> Create your own locally using the template below.
+
 ```hcl
 vm_roles            = ["web1", "web2", "app1", "db1"]
-location            = "East US"
-resource_group_name = "rg-ansible-lab"
-admin_username      = "azureuser"
-vm_size             = "Standard_B2ms"
-ssh_public_key_path = "~/.ssh/id_rsa_azure.pub"
-vnet_address_space  = "10.0.0.0/16"
-subnet_prefix       = "10.0.1.0/24"
+location            = "<your-azure-region>"
+resource_group_name = "<your-resource-group-name>"
+admin_username      = "<your-admin-username>"
+vm_size             = "<your-vm-size>"
+ssh_public_key_path = "<path-to-your-public-key>"
+vnet_address_space  = "<your-vnet-cidr>"
+subnet_prefix       = "<your-subnet-cidr>"
 ```
 
 ### Deploy Commands
@@ -289,10 +292,10 @@ terraform output vm_roles_with_ips
 
 # Example:
 # {
-#   "web1" = "20.115.24.241"
-#   "web2" = "20.102.66.87"
-#   "app1" = "20.121.188.39"
-#   "db1"  = "40.117.250.75"
+#   "web1" = "<web1_public_ip>"
+#   "web2" = "<web2_public_ip>"
+#   "app1" = "<app1_public_ip>"
+#   "db1"  = "<db1_public_ip>"
 # }
 ```
 
@@ -319,8 +322,8 @@ cd ~/ansible-onboarding/azure-ansible-lab/static-web
 
 ```ini
 [web]
-web1 ansible_host=20.115.24.241
-web2 ansible_host=20.102.66.87
+web1 ansible_host=<web1_public_ip>
+web2 ansible_host=<web2_public_ip>
 
 [web:vars]
 ansible_user=azureuser
@@ -328,7 +331,7 @@ ansible_ssh_private_key_file=~/.ssh/id_rsa_azure
 ansible_python_interpreter=/usr/bin/python3
 ```
 
-> Always use named hosts (`web1 ansible_host=IP`) — bare IPs alone cause
+> Always use named hosts (web1 ansible_host=IP) — bare IPs alone cause
 > Ansible to fail with a parse warning.
 
 ### Download index.html
@@ -369,18 +372,15 @@ nano files/index.html
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
-
     - name: Install Nginx
       ansible.builtin.apt:
         name: nginx
         state: present
-
     - name: Start and enable Nginx
       ansible.builtin.service:
         name: nginx
         state: started
         enabled: true
-
 - name: "Play 2 | Deploy Static Content"
   hosts: web
   become: true
@@ -398,7 +398,6 @@ nano files/index.html
         group: www-data
         mode: "0644"
       notify: Reload Nginx
-
 - name: "Play 3 | Verify Deployment"
   hosts: localhost
   connection: local
@@ -437,17 +436,14 @@ ansible-playbook -i inventory.ini site.yml
 ### Step 3 — Verify in browser
 
 ```
-http://20.115.24.241
-http://20.102.66.87
+http://<web1_public_ip>
+http://<web2_public_ip>
 ```
 
 ### Step 4 — Re-deploy after content changes
 
 ```bash
-# Edit content
 nano files/index.html
-
-# Push changes — Ansible only reloads Nginx if the file changed
 ansible-playbook -i inventory.ini site.yml
 ```
 
@@ -492,8 +488,8 @@ web1      : ok=7  changed=4  unreachable=0  failed=0
 web2      : ok=7  changed=4  unreachable=0  failed=0
 ```
 
-> `failed=0` on all hosts = clean run. On a second run with no changes,
-> `changed=0` everywhere — idempotency working correctly.
+> failed=0 on all hosts = clean run. On a second run with no changes,
+> changed=0 everywhere — idempotency working correctly.
 
 ---
 
@@ -501,36 +497,36 @@ web2      : ok=7  changed=4  unreachable=0  failed=0
 
 | Problem                          | Cause                         | Fix                                              |
 |----------------------------------|-------------------------------|--------------------------------------------------|
-| `site.yml could not be found`    | Wrong directory               | `cd` into `static-web/` first                   |
-| `Unable to parse inventory.ini`  | Bare IPs with no host names   | Use `web1 ansible_host=IP` format                |
-| SSH connection timeout           | Port 22 blocked               | NSG `allow-ssh` rule is already in `main.tf`     |
-| Browser shows default Nginx page | `index.html` not copied yet   | Run the playbook — Play 2 copies the file        |
-| `uri` returns non-200            | Port 80 blocked or Nginx down | Check NSG `allow-http` rule, rerun playbook      |
-| `terraform destroy` shows 0      | Wrong directory               | Run from `azure-ansible-lab/` not `static-web/`  |
-| Ansible not found                | Not in venv                   | `source ~/ansible-onboarding/.venv/bin/activate` |
+| site.yml could not be found      | Wrong directory               | cd into static-web/ first                        |
+| Unable to parse inventory.ini    | Bare IPs with no host names   | Use web1 ansible_host=IP format                  |
+| SSH connection timeout           | Port 22 blocked               | NSG allow-ssh rule is already in main.tf         |
+| Browser shows default Nginx page | index.html not copied yet     | Run the playbook — Play 2 copies the file        |
+| uri returns non-200              | Port 80 blocked or Nginx down | Check NSG allow-http rule, rerun playbook        |
+| terraform destroy shows 0        | Wrong directory               | Run from azure-ansible-lab/ not static-web/      |
+| Ansible not found                | Not in venv                   | source ~/ansible-onboarding/.venv/bin/activate   |
 
 ---
 
 ## 7. Key Learnings
 
 - **Multi-play playbooks** separate concerns cleanly — install, deploy, and verify are independent plays
-- **Handlers** are efficient — Nginx only reloads when `index.html` actually changes, not on every run
-- **`copy` module** is better than `git clone` for static content — no Git needed on remote VMs, works offline
+- **Handlers** are efficient — Nginx only reloads when index.html actually changes, not on every run
+- **copy module** is better than git clone for static content — no Git needed on remote VMs, works offline
 - **Play 3 on localhost** — Ansible can target your own machine to verify remote services over HTTP
-- **Idempotency** — running the playbook twice gives the same result; `changed=0` on second run confirms this
-- **Terraform state** lives in the directory where you run Terraform — always run from `azure-ansible-lab/`
-- **Named hosts in inventory** are required — bare IPs cause parse warnings and break `hostvars` lookups
+- **Idempotency** — running the playbook twice gives the same result; changed=0 on second run confirms this
+- **Terraform state** lives in the directory where you run Terraform — always run from azure-ansible-lab/
+- **Named hosts in inventory** are required — bare IPs cause parse warnings and break hostvars lookups
 
 ---
 
 ## 8. Cleanup
 
 ```bash
-# Always run from azure-ansible-lab/ not from static-web/
 cd ~/ansible-onboarding/azure-ansible-lab
 terraform destroy
-# Type yes when prompted
 ```
+
+> Always run from azure-ansible-lab/ not from static-web/
 
 ---
 
